@@ -17,18 +17,14 @@ export type {
 } from "./desktop/schema";
 
 export type {
-  WebAgentMemory,
-  WebArchivalMemory,
-  WebAssistant,
+  WebAiProvider,
   WebConversation,
-  WebFolder,
   WebMessage,
-  WebNewAgentMemory,
-  WebNewArchivalMemory,
-  WebNewAssistant,
+  WebNewAiProvider,
   WebNewConversation,
-  WebNewFolder,
   WebNewMessage,
   WebNewUser,
+  WebNewUserAiSetting,
   WebUser,
+  WebUserAiSetting,
 } from "./web/schema";

@@ -2,11 +2,13 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { db } from "@/db/db";
-import { aiProviders, conversations, messages, userAiSettings } from "@/db/schema";
+import { webSchema } from "@prismax/database";
 import { streamAssistantReply } from "@/lib/ai/openai";
 import { auth } from "@/lib/auth";
 import { decryptSecret } from "@/lib/crypto/encryption";
 import { and, eq } from "drizzle-orm";
+
+const { aiProviders, conversations, messages, userAiSettings } = webSchema;
 
 function asNonEmptyString(value: unknown): string | null {
   if (typeof value !== "string") return null;

@@ -4,11 +4,13 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db/db";
-import { aiProviders } from "@/db/schema";
+import { webSchema } from "@prismax/database";
 import { auth } from "@/lib/auth";
 import { importConversationFromJsonText } from "@/lib/conversations/import";
 import { encryptSecret } from "@/lib/crypto/encryption";
 import { and, desc, eq } from "drizzle-orm";
+
+const { aiProviders } = webSchema;
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value : "";

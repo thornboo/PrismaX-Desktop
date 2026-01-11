@@ -14,7 +14,7 @@ if (fs.existsSync(envLocalPath)) {
 }
 
 export default {
-  schema: "./src/db/schema.ts",
+  schema: "../../packages/database/src/web/schema.ts",
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {

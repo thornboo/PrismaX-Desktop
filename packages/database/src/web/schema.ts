@@ -1,44 +1,97 @@
 import { relations } from "drizzle-orm";
-import {
-  index,
-  pgTable,
-  primaryKey,
-  text,
-  timestamp,
-  vector,
-} from "drizzle-orm/pg-core";
+import { boolean, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
-export const users = pgTable(
-  "user",
+export const user = pgTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("email_verified").default(false).notNull(),
+  image: text("image"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
+
+export const session = pgTable(
+  "session",
   {
     id: text("id").primaryKey(),
-    email: text("email").notNull().unique(),
-    name: text("name"),
+    expiresAt: timestamp("expires_at").notNull(),
+    token: text("token").notNull().unique(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => [index("session_userId_idx").on(table.userId)],
+);
+
+export const account = pgTable(
+  "account",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at"),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("account_userId_idx").on(table.userId)],
+);
+
+export const verification = pgTable(
+  "verification",
+  {
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [index("users_email_idx").on(table.email)],
+  (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-export const folders = pgTable(
-  "folders",
+export const aiProviders = pgTable(
+  "ai_providers",
   {
     id: text("id").primaryKey(),
     userId: text("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => user.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
-    parentId: text("parent_id"),
+    openaiBaseUrl: text("openai_base_url"),
+    openaiApiKeyEnc: text("openai_api_key_enc"),
+    openaiModel: text("openai_model"),
+    isDefault: boolean("is_default").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [index("folders_userId_idx").on(table.userId)],
+  (table) => [index("ai_providers_userId_idx").on(table.userId)],
 );
 
 export const conversations = pgTable(
@@ -47,8 +100,8 @@ export const conversations = pgTable(
     id: text("id").primaryKey(),
     userId: text("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    folderId: text("folder_id").references(() => folders.id, {
+      .references(() => user.id, { onDelete: "cascade" }),
+    providerId: text("provider_id").references(() => aiProviders.id, {
       onDelete: "set null",
     }),
     title: text("title"),
@@ -58,10 +111,7 @@ export const conversations = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [
-    index("conversations_userId_idx").on(table.userId),
-    index("conversations_folderId_idx").on(table.folderId),
-  ],
+  (table) => [index("conversations_userId_idx").on(table.userId)],
 );
 
 export const messages = pgTable(
@@ -81,73 +131,65 @@ export const messages = pgTable(
   ],
 );
 
-export const assistants = pgTable(
-  "assistants",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
-    name: text("name").notNull(),
-    description: text("description"),
-    model: text("model"),
-    systemPrompt: text("system_prompt"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
-  },
-  (table) => [index("assistants_userId_idx").on(table.userId)],
-);
+export const userAiSettings = pgTable("user_ai_settings", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  openaiBaseUrl: text("openai_base_url"),
+  openaiApiKeyEnc: text("openai_api_key_enc"),
+  openaiModel: text("openai_model"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
+});
 
-export const agentMemories = pgTable(
-  "agent_memories",
-  {
-    assistantId: text("assistant_id")
-      .notNull()
-      .references(() => assistants.id, { onDelete: "cascade" }),
-    label: text("label").notNull(),
-    content: text("content").notNull(),
-    lastUpdated: timestamp("last_updated")
-      .defaultNow()
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.assistantId, table.label] }),
-    index("agent_memories_assistantId_idx").on(table.assistantId),
-  ],
-);
-
-export const archivalMemories = pgTable(
-  "archival_memories",
-  {
-    id: text("id").primaryKey(),
-    assistantId: text("assistant_id")
-      .notNull()
-      .references(() => assistants.id, { onDelete: "cascade" }),
-    content: text("content").notNull(),
-    embedding: vector("embedding", { dimensions: 1536 }).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [index("archival_memories_assistantId_idx").on(table.assistantId)],
-);
-
-export const usersRelations = relations(users, ({ many }) => ({
-  folders: many(folders),
+export const userRelations = relations(user, ({ many, one }) => ({
+  sessions: many(session),
+  accounts: many(account),
+  aiProviders: many(aiProviders),
+  userAiSettings: one(userAiSettings),
   conversations: many(conversations),
-  assistants: many(assistants),
 }));
 
-export const folderRelations = relations(folders, ({ one, many }) => ({
-  user: one(users, { fields: [folders.userId], references: [users.id] }),
-  parent: one(folders, { fields: [folders.parentId], references: [folders.id] }),
-  children: many(folders),
-  conversations: many(conversations),
+export const sessionRelations = relations(session, ({ one }) => ({
+  user: one(user, {
+    fields: [session.userId],
+    references: [user.id],
+  }),
+}));
+
+export const accountRelations = relations(account, ({ one }) => ({
+  user: one(user, {
+    fields: [account.userId],
+    references: [user.id],
+  }),
+}));
+
+export const aiProviderRelations = relations(aiProviders, ({ one }) => ({
+  user: one(user, {
+    fields: [aiProviders.userId],
+    references: [user.id],
+  }),
+}));
+
+export const userAiSettingsRelations = relations(userAiSettings, ({ one }) => ({
+  user: one(user, {
+    fields: [userAiSettings.userId],
+    references: [user.id],
+  }),
 }));
 
 export const conversationRelations = relations(conversations, ({ one, many }) => ({
-  user: one(users, { fields: [conversations.userId], references: [users.id] }),
-  folder: one(folders, { fields: [conversations.folderId], references: [folders.id] }),
+  user: one(user, {
+    fields: [conversations.userId],
+    references: [user.id],
+  }),
+  provider: one(aiProviders, {
+    fields: [conversations.providerId],
+    references: [aiProviders.id],
+  }),
   messages: many(messages),
 }));
 
@@ -158,37 +200,13 @@ export const messageRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
-export const assistantRelations = relations(assistants, ({ one, many }) => ({
-  user: one(users, { fields: [assistants.userId], references: [users.id] }),
-  coreMemories: many(agentMemories),
-  archivalMemories: many(archivalMemories),
-}));
-
-export const agentMemoryRelations = relations(agentMemories, ({ one }) => ({
-  assistant: one(assistants, {
-    fields: [agentMemories.assistantId],
-    references: [assistants.id],
-  }),
-}));
-
-export const archivalMemoryRelations = relations(archivalMemories, ({ one }) => ({
-  assistant: one(assistants, {
-    fields: [archivalMemories.assistantId],
-    references: [assistants.id],
-  }),
-}));
-
-export type WebUser = typeof users.$inferSelect;
-export type WebNewUser = typeof users.$inferInsert;
-export type WebFolder = typeof folders.$inferSelect;
-export type WebNewFolder = typeof folders.$inferInsert;
+export type WebUser = typeof user.$inferSelect;
+export type WebNewUser = typeof user.$inferInsert;
+export type WebAiProvider = typeof aiProviders.$inferSelect;
+export type WebNewAiProvider = typeof aiProviders.$inferInsert;
+export type WebUserAiSetting = typeof userAiSettings.$inferSelect;
+export type WebNewUserAiSetting = typeof userAiSettings.$inferInsert;
 export type WebConversation = typeof conversations.$inferSelect;
 export type WebNewConversation = typeof conversations.$inferInsert;
 export type WebMessage = typeof messages.$inferSelect;
 export type WebNewMessage = typeof messages.$inferInsert;
-export type WebAssistant = typeof assistants.$inferSelect;
-export type WebNewAssistant = typeof assistants.$inferInsert;
-export type WebAgentMemory = typeof agentMemories.$inferSelect;
-export type WebNewAgentMemory = typeof agentMemories.$inferInsert;
-export type WebArchivalMemory = typeof archivalMemories.$inferSelect;
-export type WebNewArchivalMemory = typeof archivalMemories.$inferInsert;

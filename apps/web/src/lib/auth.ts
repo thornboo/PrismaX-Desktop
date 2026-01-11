@@ -1,8 +1,8 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { webSchema } from "@prismax/database";
 
 import { db } from "../db/db";
-import * as schema from "../db/auth-schema";
 
 export const auth = betterAuth({
   appName: "PrismaX",
@@ -10,7 +10,7 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
   database: drizzleAdapter(db, {
     provider: "pg",
-    schema,
+    schema: webSchema,
   }),
   emailAndPassword: {
     enabled: true,

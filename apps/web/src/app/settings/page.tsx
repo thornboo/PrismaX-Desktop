@@ -3,9 +3,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db/db";
-import { aiProviders, userAiSettings } from "@/db/schema";
+import { webSchema } from "@prismax/database";
 import { auth } from "@/lib/auth";
 import { desc, eq } from "drizzle-orm";
+
+const { aiProviders, userAiSettings } = webSchema;
 
 import {
   createProviderAction,

@@ -6,8 +6,10 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db/db";
-import { conversations } from "@/db/schema";
+import { webSchema } from "@prismax/database";
 import { auth } from "@/lib/auth";
+
+const { conversations } = webSchema;
 
 export async function createConversationAction(formData: FormData) {
   const session = await auth.api.getSession({

@@ -1,8 +1,10 @@
 import "server-only";
 
 import { db } from "@/db/db";
-import { aiProviders, conversations, messages } from "@/db/schema";
+import { webSchema } from "@prismax/database";
 import { and, eq } from "drizzle-orm";
+
+const { conversations, messages } = webSchema;
 
 type ImportedMessage = {
   role?: unknown;
@@ -117,4 +119,3 @@ export async function importConversationFromJsonText(userId: string, jsonText: s
 
   return { conversationId };
 }
-

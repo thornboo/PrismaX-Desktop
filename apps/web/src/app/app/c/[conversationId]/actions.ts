@@ -6,10 +6,12 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db/db";
-import { aiProviders, conversations, messages } from "@/db/schema";
+import { webSchema } from "@prismax/database";
 import { generateAssistantReply } from "@/lib/ai/openai";
 import { auth } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
+
+const { aiProviders, conversations, messages } = webSchema;
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value : "";

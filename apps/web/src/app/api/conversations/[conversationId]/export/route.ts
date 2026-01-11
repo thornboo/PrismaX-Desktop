@@ -2,9 +2,11 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { db } from "@/db/db";
-import { aiProviders, conversations, messages } from "@/db/schema";
+import { webSchema } from "@prismax/database";
 import { auth } from "@/lib/auth";
 import { and, asc, eq } from "drizzle-orm";
+
+const { aiProviders, conversations, messages } = webSchema;
 
 function asFormat(value: string | null): "json" | "md" {
   return value === "md" ? "md" : "json";

@@ -1,6 +1,8 @@
 import { db } from "@/db/db";
-import { conversations, messages } from "@/db/schema";
+import { webSchema } from "@prismax/database";
 import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+
+const { conversations, messages } = webSchema;
 
 export type ConversationRow = typeof conversations.$inferSelect;
 
