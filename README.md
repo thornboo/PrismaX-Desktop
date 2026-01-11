@@ -2,7 +2,7 @@
 
 > Next-generation AI chat assistant — Feature-rich, Flexible deployment, Excellent experience
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 [English](./README.md) | [简体中文](./docs/zh/README.md)
 
@@ -67,4 +67,4 @@ Contributions are welcome! Please see [Contributing Guide](./CONTRIBUTING.md) fo
 
 ## License
 
-[MIT](./LICENSE)
+[Apache-2.0](./LICENSE)
