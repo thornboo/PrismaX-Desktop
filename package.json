@@ -1,0 +1,19 @@
+{
+  "name": "prismax",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:web": "turbo dev --filter=web",
+    "dev:desktop": "turbo dev --filter=desktop",
+    "build": "turbo build",
+    "build:web": "turbo build --filter=web",
+    "build:desktop": "turbo build --filter=desktop",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check",
+    "test": "turbo test"
+  }
+}
