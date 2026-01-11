@@ -22,3 +22,4 @@ export type {
   MessageRole,
 } from "./repositories/chat";
 
+export type { ChatOptions, ChatResult, IAIProvider } from "./ai/types";
