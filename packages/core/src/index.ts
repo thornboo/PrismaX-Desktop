@@ -23,3 +23,5 @@ export type {
 } from "./repositories/chat";
 
 export type { ChatOptions, ChatResult, IAIProvider } from "./ai/types";
+
+export { ChatService } from "./services/ChatService";
