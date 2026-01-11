@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0b0f19;
+  --foreground: #e5e7eb;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+    Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+.markdown .hljs {
+  background: transparent;
+}
+
+.markdown pre code {
+  display: block;
+  white-space: pre;
+}
+

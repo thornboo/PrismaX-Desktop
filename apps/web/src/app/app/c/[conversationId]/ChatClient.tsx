@@ -5,8 +5,7 @@ import { useChat } from "@ai-sdk/react";
 import { useRouter } from "next/navigation";
 import { TextStreamChatTransport } from "ai";
 
-import { MessageList } from "./MessageList";
-import { ChatInput } from "./ChatInput";
+import { ChatInput, MessageList, type ChatMessage } from "@prismax/ui";
 
 type MessageItem = {
   id: string;
@@ -19,6 +18,31 @@ type ChatClientProps = {
   conversationId: string;
   initialMessages: MessageItem[];
 };
+
+function toTextParts(parts: Array<any>): string {
+  return parts
+    .filter((p) => p && p.type === "text")
+    .map((p) => (typeof p.text === "string" ? p.text : ""))
+    .join("");
+}
+
+function toChatMessages(messages: Array<any>): ChatMessage[] {
+  return messages.map((m) => {
+    const role =
+      m?.role === "assistant" || m?.role === "system" ? m.role : "user";
+    const content =
+      typeof m?.content === "string"
+        ? m.content
+        : Array.isArray(m?.parts)
+          ? toTextParts(m.parts)
+          : "";
+    return {
+      id: typeof m?.id === "string" ? m.id : crypto.randomUUID(),
+      role,
+      content,
+    };
+  });
+}
 
 export function ChatClient({ conversationId, initialMessages }: ChatClientProps) {
   const router = useRouter();
@@ -53,6 +77,7 @@ export function ChatClient({ conversationId, initialMessages }: ChatClientProps)
 
   const isSending = status !== "ready";
   const canSend = useMemo(() => input.trim().length > 0 && !isSending, [input, isSending]);
+  const chatMessages = useMemo(() => toChatMessages(messages as Array<any>), [messages]);
 
   const onSubmit = async () => {
     const content = input.trim();
@@ -73,12 +98,12 @@ export function ChatClient({ conversationId, initialMessages }: ChatClientProps)
   return (
     <div className="flex h-full flex-col">
       <section className="flex-1 overflow-y-auto px-6 py-6">
-        {messages.length === 0 ? (
+        {chatMessages.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-6 text-sm text-zinc-400">
             还没有消息，发第一条吧。
           </div>
         ) : (
-          <MessageList messages={messages} />
+          <MessageList messages={chatMessages} />
         )}
       </section>
 
