@@ -35,12 +35,45 @@ contextBridge.exposeInMainWorld("electron", {
     },
   },
 
-  // 数据库相关
+  // 数据库相关 - 会话
   db: {
+    // 会话操作
     getConversations: () => ipcRenderer.invoke("db:getConversations"),
+    getConversation: (id: string) => ipcRenderer.invoke("db:getConversation", id),
     createConversation: (title?: string) => ipcRenderer.invoke("db:createConversation", title),
+    updateConversation: (
+      id: string,
+      updates: { title?: string; modelId?: string; pinned?: boolean },
+    ) => ipcRenderer.invoke("db:updateConversation", id, updates),
     deleteConversation: (id: string) => ipcRenderer.invoke("db:deleteConversation", id),
+
+    // 消息操作
     getMessages: (conversationId: string) => ipcRenderer.invoke("db:getMessages", conversationId),
+    createMessage: (input: {
+      conversationId: string;
+      role: "user" | "assistant" | "system";
+      content: string;
+      modelId?: string;
+    }) => ipcRenderer.invoke("db:createMessage", input),
+    updateMessage: (id: string, updates: { content?: string }) =>
+      ipcRenderer.invoke("db:updateMessage", id, updates),
+    deleteMessage: (id: string) => ipcRenderer.invoke("db:deleteMessage", id),
+  },
+
+  // 模型提供商相关
+  provider: {
+    getAll: () => ipcRenderer.invoke("provider:getAll"),
+    get: (id: string) => ipcRenderer.invoke("provider:get", id),
+    update: (id: string, updates: { apiKey?: string; baseUrl?: string; enabled?: boolean }) =>
+      ipcRenderer.invoke("provider:update", id, updates),
+    getModels: (providerId: string) => ipcRenderer.invoke("provider:getModels", providerId),
+  },
+
+  // 模型相关
+  model: {
+    getAvailable: () => ipcRenderer.invoke("model:getAvailable"),
+    getDefault: () => ipcRenderer.invoke("model:getDefault"),
+    setDefault: (modelId: string) => ipcRenderer.invoke("model:setDefault", modelId),
   },
 
   // 设置相关

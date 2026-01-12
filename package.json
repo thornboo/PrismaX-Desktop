@@ -22,7 +22,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "dev:electron": "concurrently -k \"vite\" \"pnpm build:electron --watch\" \"wait-on tcp:5173 && electronmon electron-dist/main.cjs\"",
+    "dev:electron": "concurrently -k \"vite\" \"pnpm build:electron --watch\" \"wait-on tcp:3000 && electronmon electron-dist/main.cjs\"",
     "build": "vite build",
     "build:electron": "tsup",
     "build:all": "pnpm build && pnpm build:electron",
@@ -60,6 +60,7 @@
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.38.3",
     "framer-motion": "^11.15.0",
+    "highlight.js": "^11.11.1",
     "lucide-react": "^0.469.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

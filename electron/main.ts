@@ -1,9 +1,14 @@
 import path from "node:path";
 import { app, BrowserWindow, dialog, Tray, Menu, nativeImage } from "electron";
+import { registerIpcHandlers } from "./ipc";
+import { initDatabase, closeDatabase } from "./db";
+
+// 开发服务器端口 - 与 vite.config.ts 保持一致
+const DEV_SERVER_PORT = 3000;
 
 // 开发环境使用 Vite 开发服务器，生产环境加载打包后的文件
 const isDev = process.env.NODE_ENV !== "production";
-const rendererUrl = isDev ? "http://localhost:5173" : undefined;
+const rendererUrl = isDev ? `http://localhost:${DEV_SERVER_PORT}` : undefined;
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -117,6 +122,12 @@ declare module "electron" {
 
 app.whenReady().then(() => {
   try {
+    // 初始化数据库（必须在注册 IPC handlers 前完成）
+    initDatabase();
+
+    // 注册 IPC handlers
+    registerIpcHandlers();
+
     createMainWindow();
     createTray();
   } catch (error) {
@@ -146,4 +157,6 @@ app.on("window-all-closed", () => {
 // 退出前清理
 app.on("before-quit", () => {
   app.isQuitting = true;
+  // 关闭数据库连接
+  closeDatabase();
 });
