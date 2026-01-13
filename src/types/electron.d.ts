@@ -77,6 +77,36 @@ export interface KnowledgeSearchResult {
   score: number;
 }
 
+export interface KnowledgeDocument {
+  id: string;
+  kind: "file" | "note";
+  title: string;
+  sourcePath: string | null;
+  blobSha256: string | null;
+  blobRelPath: string | null;
+  mimeType: string | null;
+  sizeBytes: number;
+  sha256: string | null;
+  sourceMtimeMs: number | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface KnowledgeVectorConfig {
+  providerId: string;
+  model: string;
+  dimension: number;
+  updatedAt: number;
+}
+
+export interface KnowledgeVectorSearchResult {
+  chunkId: string;
+  documentId: string;
+  documentTitle: string;
+  content: string;
+  distance: number | null;
+}
+
 // ============ API 类型 ============
 
 export interface ElectronAPI {
@@ -189,6 +219,35 @@ export interface ElectronAPI {
     }) => Promise<KnowledgeBase>;
     deleteBase: (input: { kbId: string; confirmed: boolean }) => Promise<{ success: boolean }>;
     getStats: (kbId: string) => Promise<{ documents: number; chunks: number; jobs: number }>;
+    getVectorConfig: (kbId: string) => Promise<{ config: KnowledgeVectorConfig | null }>;
+    rebuildVectorIndex: (input: {
+      kbId: string;
+      confirmed: boolean;
+    }) => Promise<{ success: boolean }>;
+    buildVectorIndex: (input: {
+      kbId: string;
+      providerId: string;
+      model: string;
+    }) => Promise<{ jobId: string }>;
+    resumeVectorIndex: (input: {
+      kbId: string;
+      jobId: string;
+      providerId: string;
+      model: string;
+    }) => Promise<{ success: boolean }>;
+    semanticSearch: (input: {
+      kbId: string;
+      providerId: string;
+      model: string;
+      query: string;
+      topK?: number;
+    }) => Promise<{ results: KnowledgeVectorSearchResult[] }>;
+    listDocuments: (input: { kbId: string; limit?: number }) => Promise<KnowledgeDocument[]>;
+    deleteDocument: (input: {
+      kbId: string;
+      documentId: string;
+      confirmed: boolean;
+    }) => Promise<{ success: boolean }>;
     selectFiles: () => Promise<string[] | null>;
     importFiles: (input: {
       kbId: string;

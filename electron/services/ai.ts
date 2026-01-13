@@ -59,7 +59,7 @@ export async function sendChatMessage(
     }
 
     // 保存用户消息
-    const userMessage = createMessage({
+    const _userMessage = createMessage({
       conversationId: input.conversationId,
       role: "user",
       content: input.content,

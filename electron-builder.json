@@ -13,7 +13,9 @@
     "dist/**/*",
     "electron-dist/**/*",
     "!node_modules/**/*",
-    "node_modules/better-sqlite3/**/*"
+    "node_modules/better-sqlite3/**/*",
+    "node_modules/@lancedb/**/*",
+    "node_modules/apache-arrow/**/*"
   ],
 
   "extraMetadata": {
@@ -21,7 +23,11 @@
   },
 
   "asar": true,
-  "asarUnpack": ["node_modules/better-sqlite3/**/*", "electron-dist/knowledge/kb-worker.cjs"],
+  "asarUnpack": [
+    "node_modules/better-sqlite3/**/*",
+    "node_modules/@lancedb/**/*",
+    "electron-dist/knowledge/kb-worker.cjs"
+  ],
 
   "mac": {
     "category": "public.app-category.productivity",

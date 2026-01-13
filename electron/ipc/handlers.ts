@@ -535,6 +535,110 @@ function registerKnowledgeBaseHandlers(): void {
     return worker.call("kb.getStats", { kbId: input.kbId });
   });
 
+  ipcMain.handle("kb:getVectorConfig", async (_event, input: { kbId: string }) => {
+    const worker = getKnowledgeWorker();
+    return worker.call("kb.getVectorConfig", { kbId: input.kbId });
+  });
+
+  ipcMain.handle(
+    "kb:rebuildVectorIndex",
+    async (_event, input: { kbId: string; confirmed: boolean }) => {
+      const worker = getKnowledgeWorker();
+      return worker.call("kb.rebuildVectorIndex", input);
+    },
+  );
+
+  ipcMain.handle(
+    "kb:buildVectorIndex",
+    async (_event, input: { kbId: string; providerId: string; model: string }) => {
+      const provider = providerService.getProvider(input.providerId);
+      if (!provider) throw new Error(`未找到提供商: ${input.providerId}`);
+      if (!provider.enabled) throw new Error(`提供商 ${provider.name} 未启用`);
+
+      const apiKey = providerService.getProviderApiKey(input.providerId);
+      if (!apiKey) throw new Error(`提供商 ${provider.name} 未配置 API Key`);
+
+      const worker = getKnowledgeWorker();
+      return worker.call(
+        "kb.buildVectorIndex",
+        {
+          kbId: input.kbId,
+          providerId: input.providerId,
+          model: input.model,
+          embedding: { baseUrl: provider.baseUrl ?? "", apiKey, model: input.model },
+        },
+        5 * 60_000,
+      );
+    },
+  );
+
+  ipcMain.handle(
+    "kb:resumeVectorIndex",
+    async (_event, input: { kbId: string; jobId: string; providerId: string; model: string }) => {
+      const provider = providerService.getProvider(input.providerId);
+      if (!provider) throw new Error(`未找到提供商: ${input.providerId}`);
+      if (!provider.enabled) throw new Error(`提供商 ${provider.name} 未启用`);
+
+      const apiKey = providerService.getProviderApiKey(input.providerId);
+      if (!apiKey) throw new Error(`提供商 ${provider.name} 未配置 API Key`);
+
+      const worker = getKnowledgeWorker();
+      return worker.call(
+        "kb.resumeVectorIndex",
+        {
+          kbId: input.kbId,
+          jobId: input.jobId,
+          providerId: input.providerId,
+          model: input.model,
+          embedding: { baseUrl: provider.baseUrl ?? "", apiKey, model: input.model },
+        },
+        5 * 60_000,
+      );
+    },
+  );
+
+  ipcMain.handle(
+    "kb:semanticSearch",
+    async (
+      _event,
+      input: { kbId: string; providerId: string; model: string; query: string; topK?: number },
+    ) => {
+      const provider = providerService.getProvider(input.providerId);
+      if (!provider) throw new Error(`未找到提供商: ${input.providerId}`);
+      if (!provider.enabled) throw new Error(`提供商 ${provider.name} 未启用`);
+
+      const apiKey = providerService.getProviderApiKey(input.providerId);
+      if (!apiKey) throw new Error(`提供商 ${provider.name} 未配置 API Key`);
+
+      const worker = getKnowledgeWorker();
+      return worker.call(
+        "kb.semanticSearch",
+        {
+          kbId: input.kbId,
+          providerId: input.providerId,
+          model: input.model,
+          query: input.query,
+          topK: input.topK,
+          embedding: { baseUrl: provider.baseUrl ?? "", apiKey, model: input.model },
+        },
+        60_000,
+      );
+    },
+  );
+
+  ipcMain.handle("kb:listDocuments", async (_event, input: { kbId: string; limit?: number }) => {
+    const worker = getKnowledgeWorker();
+    return worker.call("kb.listDocuments", input);
+  });
+
+  ipcMain.handle(
+    "kb:deleteDocument",
+    async (_event, input: { kbId: string; documentId: string; confirmed: boolean }) => {
+      const worker = getKnowledgeWorker();
+      return worker.call("kb.deleteDocument", input);
+    },
+  );
+
   ipcMain.handle("kb:selectFiles", async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       title: "选择要导入的文件",

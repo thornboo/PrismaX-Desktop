@@ -8,7 +8,7 @@ export default defineConfig({
   clean: true,
   splitting: false,
   dts: false,
-  external: ["electron", "better-sqlite3"],
+  external: ["electron", "better-sqlite3", "@lancedb/lancedb", "apache-arrow"],
   outExtension() {
     return { js: ".cjs" };
   },

@@ -110,6 +110,28 @@ contextBridge.exposeInMainWorld("electron", {
     deleteBase: (input: { kbId: string; confirmed: boolean }) =>
       ipcRenderer.invoke("kb:delete", input),
     getStats: (kbId: string) => ipcRenderer.invoke("kb:getStats", { kbId }),
+    getVectorConfig: (kbId: string) => ipcRenderer.invoke("kb:getVectorConfig", { kbId }),
+    rebuildVectorIndex: (input: { kbId: string; confirmed: boolean }) =>
+      ipcRenderer.invoke("kb:rebuildVectorIndex", input),
+    buildVectorIndex: (input: { kbId: string; providerId: string; model: string }) =>
+      ipcRenderer.invoke("kb:buildVectorIndex", input),
+    resumeVectorIndex: (input: {
+      kbId: string;
+      jobId: string;
+      providerId: string;
+      model: string;
+    }) => ipcRenderer.invoke("kb:resumeVectorIndex", input),
+    semanticSearch: (input: {
+      kbId: string;
+      providerId: string;
+      model: string;
+      query: string;
+      topK?: number;
+    }) => ipcRenderer.invoke("kb:semanticSearch", input),
+    listDocuments: (input: { kbId: string; limit?: number }) =>
+      ipcRenderer.invoke("kb:listDocuments", input),
+    deleteDocument: (input: { kbId: string; documentId: string; confirmed: boolean }) =>
+      ipcRenderer.invoke("kb:deleteDocument", input),
     selectFiles: () => ipcRenderer.invoke("kb:selectFiles"),
     importFiles: (input: { kbId: string; sources: Array<{ type: string; paths: string[] }> }) =>
       ipcRenderer.invoke("kb:importFiles", input),

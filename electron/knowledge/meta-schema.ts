@@ -101,4 +101,55 @@ export const KNOWLEDGE_META_MIGRATIONS: KnowledgeMetaMigration[] = [
       CREATE UNIQUE INDEX IF NOT EXISTS idx_job_items_job_source_path ON job_items(job_id, source_path);
     `,
   },
+  {
+    id: 3,
+    name: "blobs_and_fingerprints",
+    sql: `
+      CREATE TABLE IF NOT EXISTS blobs (
+        sha256 TEXT PRIMARY KEY,
+        rel_path TEXT NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        mime_type TEXT,
+        created_at INTEGER NOT NULL,
+        ref_count INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_blobs_ref_count ON blobs(ref_count);
+
+      CREATE TABLE IF NOT EXISTS file_fingerprints (
+        source_path TEXT PRIMARY KEY,
+        size_bytes INTEGER NOT NULL,
+        mtime_ms INTEGER NOT NULL,
+        sha256 TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_file_fingerprints_sha256 ON file_fingerprints(sha256);
+
+      ALTER TABLE documents ADD COLUMN blob_sha256 TEXT;
+      ALTER TABLE documents ADD COLUMN source_mtime_ms INTEGER;
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_unique_source_path
+      ON documents(source_path)
+      WHERE kind = 'file' AND source_path IS NOT NULL;
+    `,
+  },
+  {
+    id: 4,
+    name: "vector_index_state",
+    sql: `
+      CREATE TABLE IF NOT EXISTS vector_config (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        provider_id TEXT NOT NULL,
+        model TEXT NOT NULL,
+        dimension INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS chunk_vectors (
+        chunk_id TEXT PRIMARY KEY REFERENCES chunks(id) ON DELETE CASCADE,
+        config_hash TEXT NOT NULL,
+        indexed_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_chunk_vectors_config_hash ON chunk_vectors(config_hash);
+    `,
+  },
 ];

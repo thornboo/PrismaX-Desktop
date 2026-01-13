@@ -1,10 +1,30 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, FolderOpen, Import, Pause, Play, Search, Square, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  FolderOpen,
+  Import,
+  Pause,
+  Play,
+  Search,
+  Square,
+  Trash2,
+  Wand2,
+} from "lucide-react";
 
 type KnowledgeBaseType = Awaited<ReturnType<typeof window.electron.knowledge.listBases>>[number];
 type KnowledgeJob = Awaited<ReturnType<typeof window.electron.knowledge.listJobs>>[number];
 type SearchResult = Awaited<ReturnType<typeof window.electron.knowledge.search>>["results"][number];
+type KnowledgeDocument = Awaited<
+  ReturnType<typeof window.electron.knowledge.listDocuments>
+>[number];
+type Provider = Awaited<ReturnType<typeof window.electron.provider.getAll>>[number];
+type KnowledgeVectorConfig = Awaited<
+  ReturnType<typeof window.electron.knowledge.getVectorConfig>
+>["config"];
+type SemanticResult = Awaited<
+  ReturnType<typeof window.electron.knowledge.semanticSearch>
+>["results"][number];
 
 function formatDate(ts: number | null | undefined): string {
   if (!ts) return "-";
@@ -21,6 +41,18 @@ function formatProgress(current: number, total: number): string {
   return `${current}/${total} (${pct}%)`;
 }
 
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "-";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let idx = 0;
+  while (value >= 1024 && idx < units.length - 1) {
+    value /= 1024;
+    idx += 1;
+  }
+  return `${value.toFixed(idx === 0 ? 0 : 1)} ${units[idx]}`;
+}
+
 export function KnowledgeBase() {
   const { kbId } = useParams<{ kbId: string }>();
   const navigate = useNavigate();
@@ -29,8 +61,16 @@ export function KnowledgeBase() {
     null,
   );
   const [jobs, setJobs] = useState<KnowledgeJob[]>([]);
+  const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [embeddingProviderId, setEmbeddingProviderId] = useState("openai");
+  const [embeddingModel, setEmbeddingModel] = useState("text-embedding-3-small");
+  const [vectorConfig, setVectorConfig] = useState<KnowledgeVectorConfig>(null);
+  const [semanticQuery, setSemanticQuery] = useState("");
+  const [semanticResults, setSemanticResults] = useState<SemanticResult[]>([]);
+  const [semanticTopK, setSemanticTopK] = useState(10);
   const [busy, setBusy] = useState(false);
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
@@ -48,8 +88,11 @@ export function KnowledgeBase() {
       const bases = await window.electron.knowledge.listBases();
       const found = bases.find((b) => b.id === kbIdSafe) ?? null;
       setKb(found);
+      setProviders(await window.electron.provider.getAll());
       setJobs(await window.electron.knowledge.listJobs(kbIdSafe));
+      setDocuments(await window.electron.knowledge.listDocuments({ kbId: kbIdSafe, limit: 200 }));
       setStats(await window.electron.knowledge.getStats(kbIdSafe));
+      setVectorConfig((await window.electron.knowledge.getVectorConfig(kbIdSafe)).config);
     } finally {
       setBusy(false);
     }
@@ -58,6 +101,13 @@ export function KnowledgeBase() {
   useEffect(() => {
     void loadAll();
   }, [kbIdSafe]);
+
+  useEffect(() => {
+    const enabled = providers.filter((p) => p.enabled);
+    if (enabled.length === 0) return;
+    if (enabled.some((p) => p.id === embeddingProviderId)) return;
+    setEmbeddingProviderId(enabled[0].id);
+  }, [providers, embeddingProviderId]);
 
   useEffect(() => {
     const off = window.electron.knowledge.onJobUpdate((payload) => {
@@ -115,6 +165,52 @@ export function KnowledgeBase() {
     setResults(res.results);
   };
 
+  const handleSemanticSearch = async () => {
+    if (!kbIdSafe) return;
+    if (!embeddingProviderId) {
+      alert("请先选择并启用一个提供商");
+      return;
+    }
+    const q = semanticQuery.trim();
+    if (!q) {
+      setSemanticResults([]);
+      return;
+    }
+    const res = await window.electron.knowledge.semanticSearch({
+      kbId: kbIdSafe,
+      providerId: embeddingProviderId,
+      model: embeddingModel.trim(),
+      query: q,
+      topK: semanticTopK,
+    });
+    setSemanticResults(res.results);
+  };
+
+  const handleBuildVectorIndex = async () => {
+    if (!kbIdSafe) return;
+    if (!embeddingProviderId) {
+      alert("请先选择并启用一个提供商");
+      return;
+    }
+    await window.electron.knowledge.buildVectorIndex({
+      kbId: kbIdSafe,
+      providerId: embeddingProviderId,
+      model: embeddingModel.trim(),
+    });
+    await loadAll();
+  };
+
+  const handleRebuildVectorIndex = async () => {
+    if (!kbIdSafe) return;
+    const confirmed = confirm(
+      "⚠️ 危险操作：将删除该知识库的向量索引（派生数据）并清空索引状态，之后需要重新构建。是否继续？",
+    );
+    if (!confirmed) return;
+    await window.electron.knowledge.rebuildVectorIndex({ kbId: kbIdSafe, confirmed: true });
+    setSemanticResults([]);
+    await loadAll();
+  };
+
   const handleCreateNote = async () => {
     if (!kbIdSafe) return;
     if (!noteTitle.trim()) {
@@ -139,13 +235,33 @@ export function KnowledgeBase() {
     navigate("/knowledge");
   };
 
+  const handleDeleteDocument = async (documentId: string) => {
+    const confirmed = confirm("⚠️ 危险操作：确定要从知识库删除该文档吗？相关索引也会被删除。");
+    if (!confirmed) return;
+    await window.electron.knowledge.deleteDocument({ kbId: kbIdSafe, documentId, confirmed: true });
+    await loadAll();
+  };
+
   const handlePause = async (jobId: string) => {
     await window.electron.knowledge.pauseJob({ kbId: kbIdSafe, jobId });
     await loadAll();
   };
 
-  const handleResume = async (jobId: string) => {
-    await window.electron.knowledge.resumeJob({ kbId: kbIdSafe, jobId });
+  const handleResume = async (jobId: string, jobType: string) => {
+    if (jobType === "build_vectors") {
+      if (!embeddingProviderId) {
+        alert("请先选择并启用一个提供商");
+        return;
+      }
+      await window.electron.knowledge.resumeVectorIndex({
+        kbId: kbIdSafe,
+        jobId,
+        providerId: embeddingProviderId,
+        model: embeddingModel.trim(),
+      });
+    } else {
+      await window.electron.knowledge.resumeJob({ kbId: kbIdSafe, jobId });
+    }
     await loadAll();
   };
 
@@ -231,6 +347,44 @@ export function KnowledgeBase() {
           )}
         </div>
 
+        {/* Documents */}
+        <div className="rounded-lg border border-border p-4">
+          <div className="text-sm font-medium">文档</div>
+          {documents.length === 0 ? (
+            <div className="mt-2 text-sm text-muted-foreground">暂无文档</div>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {documents.slice(0, 50).map((doc) => (
+                <div
+                  key={doc.id}
+                  className="flex items-center justify-between gap-3 rounded border border-border p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm truncate">
+                      {doc.title}{" "}
+                      <span className="text-xs text-muted-foreground">({doc.kind})</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1 truncate">
+                      {doc.sourcePath ? doc.sourcePath : "—"} · {formatBytes(doc.sizeBytes)} · 更新{" "}
+                      {formatDate(doc.updatedAt)}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => void handleDeleteDocument(doc.id)}
+                    className="p-2 rounded hover:bg-destructive/20 text-destructive transition-colors"
+                    title="删除"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+              {documents.length > 50 && (
+                <div className="text-xs text-muted-foreground">仅显示最近 50 条</div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Jobs */}
         <div className="rounded-lg border border-border p-4">
           <div className="text-sm font-medium">任务</div>
@@ -269,7 +423,7 @@ export function KnowledgeBase() {
                     )}
                     {job.status === "paused" && (
                       <button
-                        onClick={() => void handleResume(job.id)}
+                        onClick={() => void handleResume(job.id, String(job.type))}
                         className="p-2 rounded hover:bg-accent transition-colors"
                         title="继续"
                       >
@@ -328,6 +482,132 @@ export function KnowledgeBase() {
             </div>
           )}
           {results.length === 0 && query.trim() && (
+            <div className="mt-3 text-sm text-muted-foreground">无结果</div>
+          )}
+        </div>
+
+        {/* Vector */}
+        <div className="rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">向量索引（LanceDB）</div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleBuildVectorIndex}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                <Wand2 size={16} />
+                <span className="text-sm">构建/增量更新</span>
+              </button>
+              <button
+                onClick={handleRebuildVectorIndex}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border hover:bg-destructive/20 text-destructive transition-colors"
+              >
+                <Trash2 size={16} />
+                <span className="text-sm">重建</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div className="flex flex-col gap-1">
+              <div className="text-xs text-muted-foreground">Embedding Provider</div>
+              <select
+                value={embeddingProviderId}
+                onChange={(e) => setEmbeddingProviderId(e.target.value)}
+                className="px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {providers.filter((p) => p.enabled).length === 0 ? (
+                  <option value="" disabled>
+                    无可用提供商（请先在设置中启用并配置 API Key）
+                  </option>
+                ) : (
+                  providers
+                    .filter((p) => p.enabled)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.id})
+                      </option>
+                    ))
+                )}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1 md:col-span-2">
+              <div className="text-xs text-muted-foreground">Embedding Model</div>
+              <input
+                value={embeddingModel}
+                onChange={(e) => setEmbeddingModel(e.target.value)}
+                placeholder="例如：text-embedding-3-small"
+                className="px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 text-xs text-muted-foreground">
+            {vectorConfig ? (
+              <>
+                已配置：{vectorConfig.providerId} · {vectorConfig.model} · dim{" "}
+                {vectorConfig.dimension}· 更新 {formatDate(vectorConfig.updatedAt)}
+              </>
+            ) : (
+              "未检测到向量索引配置（请先构建）"
+            )}
+          </div>
+        </div>
+
+        {/* Semantic Search */}
+        <div className="rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-medium">语义检索（向量）</div>
+            <button
+              onClick={handleSemanticSearch}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <Search size={16} />
+              <span className="text-sm">搜索</span>
+            </button>
+          </div>
+          <div className="mt-3 flex flex-col gap-2">
+            <input
+              value={semanticQuery}
+              onChange={(e) => setSemanticQuery(e.target.value)}
+              placeholder="输入语义检索文本..."
+              className="w-full px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">TopK</span>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={semanticTopK}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  if (!Number.isFinite(n)) return;
+                  setSemanticTopK(Math.min(50, Math.max(1, n)));
+                }}
+                className="w-24 px-3 py-2 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          </div>
+          {semanticResults.length > 0 && (
+            <div className="mt-4 space-y-2">
+              {semanticResults.map((r) => (
+                <div key={r.chunkId} className="rounded border border-border p-3">
+                  <div className="text-sm">
+                    <span className="font-medium">{r.documentTitle}</span>{" "}
+                    <span className="text-xs text-muted-foreground">
+                      {r.distance === null ? "" : `distance ${r.distance.toFixed(4)}`}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">
+                    {r.content}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {semanticResults.length === 0 && semanticQuery.trim() && (
             <div className="mt-3 text-sm text-muted-foreground">无结果</div>
           )}
         </div>

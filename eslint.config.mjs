@@ -7,6 +7,7 @@ export default [
   {
     ignores: [
       "**/node_modules/**",
+      "**/.reference/**",
       "**/.next/**",
       "**/out/**",
       "**/dist/**",
@@ -15,6 +16,7 @@ export default [
       "**/.turbo/**",
       "**/electron-dist/**",
       "**/drizzle/**",
+      "**/release/**",
       "**/next-env.d.ts",
     ],
   },
