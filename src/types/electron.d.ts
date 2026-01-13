@@ -109,22 +109,28 @@ export interface KnowledgeVectorSearchResult {
 
 // ============ API 类型 ============
 
+export type IpcResponse<T> =
+  | { success: true; data: T; error: null }
+  | { success: false; data: null; error: string };
+
 export interface ElectronAPI {
   // 系统相关
   system: {
-    getAppVersion: () => Promise<string>;
-    getAppInfo: () => Promise<{
-      appVersion: string;
-      platform: string;
-      userDataPath: string;
-      databaseFilePath: string;
-    }>;
-    checkUpdate: () => Promise<{ hasUpdate: boolean; currentVersion: string }>;
-    openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
-    openPath: (targetPath: string) => Promise<{ success: boolean; error?: string }>;
-    selectDirectory: () => Promise<string | null>;
-    minimize: () => Promise<void>;
-    close: () => Promise<void>;
+    getAppVersion: () => Promise<IpcResponse<string>>;
+    getAppInfo: () => Promise<
+      IpcResponse<{
+        appVersion: string;
+        platform: string;
+        userDataPath: string;
+        databaseFilePath: string;
+      }>
+    >;
+    checkUpdate: () => Promise<IpcResponse<{ hasUpdate: boolean; currentVersion: string }>>;
+    openExternal: (url: string) => Promise<IpcResponse<null>>;
+    openPath: (targetPath: string) => Promise<IpcResponse<null>>;
+    selectDirectory: () => Promise<IpcResponse<string>>;
+    minimize: () => Promise<IpcResponse<null>>;
+    close: () => Promise<IpcResponse<null>>;
   };
 
   // 聊天相关
@@ -133,9 +139,9 @@ export interface ElectronAPI {
       conversationId: string;
       content: string;
       modelId?: string;
-    }) => Promise<{ requestId: string; messageId: string }>;
-    cancel: (requestId: string) => Promise<{ success: boolean }>;
-    history: (conversationId: string) => Promise<Message[]>;
+    }) => Promise<IpcResponse<{ requestId: string; messageId: string }>>;
+    cancel: (requestId: string) => Promise<IpcResponse<null>>;
+    history: (conversationId: string) => Promise<IpcResponse<Message[]>>;
     onToken: (callback: (payload: { requestId: string; token: string }) => void) => () => void;
     onDone: (callback: (payload: { requestId: string }) => void) => () => void;
     onError: (callback: (payload: { requestId: string; message: string }) => void) => () => void;
@@ -144,127 +150,158 @@ export interface ElectronAPI {
   // 数据库相关 - 会话和消息
   db: {
     // 会话操作
-    getConversations: () => Promise<Conversation[]>;
-    getConversation: (id: string) => Promise<Conversation | null>;
-    createConversation: (title?: string) => Promise<Conversation>;
+    getConversations: () => Promise<IpcResponse<Conversation[]>>;
+    getConversation: (id: string) => Promise<IpcResponse<Conversation | null>>;
+    createConversation: (title?: string) => Promise<IpcResponse<Conversation>>;
     updateConversation: (
       id: string,
       updates: { title?: string; modelId?: string; pinned?: boolean },
-    ) => Promise<Conversation | null>;
-    deleteConversation: (id: string) => Promise<{ success: boolean; id: string }>;
+    ) => Promise<IpcResponse<Conversation>>;
+    deleteConversation: (id: string) => Promise<IpcResponse<{ id: string }>>;
 
     // 消息操作
-    getMessages: (conversationId: string) => Promise<Message[]>;
+    getMessages: (conversationId: string) => Promise<IpcResponse<Message[]>>;
     createMessage: (input: {
       conversationId: string;
       role: "user" | "assistant" | "system";
       content: string;
       modelId?: string;
-    }) => Promise<Message>;
-    updateMessage: (id: string, updates: { content?: string }) => Promise<Message | null>;
-    deleteMessage: (id: string) => Promise<{ success: boolean; id: string }>;
+    }) => Promise<IpcResponse<Message>>;
+    updateMessage: (id: string, updates: { content?: string }) => Promise<IpcResponse<Message>>;
+    deleteMessage: (id: string) => Promise<IpcResponse<{ id: string }>>;
   };
 
   // 模型提供商相关
   provider: {
-    getAll: () => Promise<Provider[]>;
-    get: (id: string) => Promise<Provider | null>;
+    getAll: () => Promise<IpcResponse<Provider[]>>;
+    get: (id: string) => Promise<IpcResponse<Provider | null>>;
     update: (
       id: string,
       updates: { apiKey?: string; baseUrl?: string; enabled?: boolean },
-    ) => Promise<Provider | null>;
-    getModels: (providerId: string) => Promise<Model[]>;
+    ) => Promise<IpcResponse<Provider>>;
+    getModels: (providerId: string) => Promise<IpcResponse<Model[]>>;
   };
 
   // 模型相关
   model: {
-    getAvailable: () => Promise<Model[]>;
-    getDefault: () => Promise<Model | null>;
-    setDefault: (modelId: string) => Promise<{ success: boolean }>;
+    getAvailable: () => Promise<IpcResponse<Model[]>>;
+    getDefault: () => Promise<IpcResponse<Model | null>>;
+    setDefault: (modelId: string) => Promise<IpcResponse<null>>;
   };
 
   // 设置相关
   settings: {
-    get: <T = unknown>(key: string) => Promise<T | null>;
-    set: (key: string, value: unknown) => Promise<{ success: boolean }>;
-    getAll: () => Promise<Record<string, unknown>>;
+    get: <T = unknown>(key: string) => Promise<IpcResponse<T | null>>;
+    set: (key: string, value: unknown) => Promise<IpcResponse<null>>;
+    getAll: () => Promise<IpcResponse<Record<string, unknown>>>;
   };
 
   // 数据管理
   data: {
-    exportConversations: () => Promise<{ filePath: string } | null>;
-    exportSettings: () => Promise<{ filePath: string } | null>;
-    importConversations: () => Promise<{
-      filePath: string;
-      conversationsAdded: number;
-      messagesAdded: number;
-    } | null>;
-    importSettings: () => Promise<{
-      filePath: string;
-      settingsUpdated: number;
-      providersUpdated: number;
-    } | null>;
-    clearAllConversations: () => Promise<{ deletedConversations: number; deletedMessages: number }>;
-    resetApp: () => Promise<{ success: boolean }>;
-    migrateDataRoot: (targetDir: string) => Promise<{ success: boolean }>;
+    exportConversations: () => Promise<IpcResponse<{ filePath: string }>>;
+    exportSettings: () => Promise<IpcResponse<{ filePath: string }>>;
+    importConversations: () => Promise<
+      IpcResponse<{
+        filePath: string;
+        conversationsAdded: number;
+        messagesAdded: number;
+      }>
+    >;
+    importSettings: () => Promise<
+      IpcResponse<{
+        filePath: string;
+        settingsUpdated: number;
+        providersUpdated: number;
+      }>
+    >;
+    clearAllConversations: () => Promise<
+      IpcResponse<{ deletedConversations: number; deletedMessages: number }>
+    >;
+    resetApp: () => Promise<IpcResponse<null>>;
+    migrateDataRoot: (targetDir: string) => Promise<IpcResponse<null>>;
   };
 
   // 知识库
   knowledge: {
-    listBases: () => Promise<KnowledgeBase[]>;
-    createBase: (input: { name: string; description?: string | null }) => Promise<KnowledgeBase>;
+    listBases: () => Promise<IpcResponse<KnowledgeBase[]>>;
+    createBase: (input: {
+      name: string;
+      description?: string | null;
+    }) => Promise<IpcResponse<KnowledgeBase>>;
     updateBase: (input: {
       kbId: string;
       updates: { name?: string; description?: string | null };
-    }) => Promise<KnowledgeBase>;
-    deleteBase: (input: { kbId: string; confirmed: boolean }) => Promise<{ success: boolean }>;
-    getStats: (kbId: string) => Promise<{ documents: number; chunks: number; jobs: number }>;
-    getVectorConfig: (kbId: string) => Promise<{ config: KnowledgeVectorConfig | null }>;
+    }) => Promise<IpcResponse<KnowledgeBase>>;
+    deleteBase: (input: { kbId: string; confirmed: boolean }) => Promise<IpcResponse<null>>;
+    getStats: (
+      kbId: string,
+    ) => Promise<IpcResponse<{ documents: number; chunks: number; jobs: number }>>;
+    getVectorConfig: (
+      kbId: string,
+    ) => Promise<IpcResponse<{ config: KnowledgeVectorConfig | null }>>;
     rebuildVectorIndex: (input: {
       kbId: string;
       confirmed: boolean;
-    }) => Promise<{ success: boolean }>;
+    }) => Promise<IpcResponse<{ success: boolean }>>;
     buildVectorIndex: (input: {
       kbId: string;
       providerId: string;
       model: string;
-    }) => Promise<{ jobId: string }>;
+    }) => Promise<IpcResponse<{ jobId: string }>>;
     resumeVectorIndex: (input: {
       kbId: string;
       jobId: string;
       providerId: string;
       model: string;
-    }) => Promise<{ success: boolean }>;
+    }) => Promise<IpcResponse<{ success: boolean }>>;
     semanticSearch: (input: {
       kbId: string;
       providerId: string;
       model: string;
       query: string;
       topK?: number;
-    }) => Promise<{ results: KnowledgeVectorSearchResult[] }>;
-    listDocuments: (input: { kbId: string; limit?: number }) => Promise<KnowledgeDocument[]>;
+    }) => Promise<IpcResponse<{ results: KnowledgeVectorSearchResult[] }>>;
+    listDocuments: (input: {
+      kbId: string;
+      limit?: number;
+    }) => Promise<IpcResponse<KnowledgeDocument[]>>;
     deleteDocument: (input: {
       kbId: string;
       documentId: string;
       confirmed: boolean;
-    }) => Promise<{ success: boolean }>;
-    selectFiles: () => Promise<string[] | null>;
+    }) => Promise<IpcResponse<{ success: boolean }>>;
+    selectFiles: () => Promise<IpcResponse<string[]>>;
     importFiles: (input: {
       kbId: string;
       sources: Array<{ type: string; paths: string[] }>;
-    }) => Promise<{
+    }) => Promise<
+      IpcResponse<{
+        jobId: string;
+      }>
+    >;
+    listJobs: (kbId: string) => Promise<IpcResponse<KnowledgeJob[]>>;
+    pauseJob: (input: {
+      kbId: string;
       jobId: string;
-    }>;
-    listJobs: (kbId: string) => Promise<KnowledgeJob[]>;
-    pauseJob: (input: { kbId: string; jobId: string }) => Promise<{ success: boolean }>;
-    resumeJob: (input: { kbId: string; jobId: string }) => Promise<{ success: boolean }>;
-    cancelJob: (input: { kbId: string; jobId: string }) => Promise<{ success: boolean }>;
-    search: (input: { kbId: string; query: string; limit?: number }) => Promise<{
-      results: KnowledgeSearchResult[];
-    }>;
-    createNote: (input: { kbId: string; title: string; content: string }) => Promise<{
-      documentId: string;
-    }>;
+    }) => Promise<IpcResponse<{ success: boolean }>>;
+    resumeJob: (input: {
+      kbId: string;
+      jobId: string;
+    }) => Promise<IpcResponse<{ success: boolean }>>;
+    cancelJob: (input: {
+      kbId: string;
+      jobId: string;
+    }) => Promise<IpcResponse<{ success: boolean }>>;
+    search: (input: { kbId: string; query: string; limit?: number }) => Promise<
+      IpcResponse<{
+        results: KnowledgeSearchResult[];
+      }>
+    >;
+    createNote: (input: { kbId: string; title: string; content: string }) => Promise<
+      IpcResponse<{
+        documentId: string;
+      }>
+    >;
     onJobUpdate: (callback: (payload: unknown) => void) => () => void;
   };
 

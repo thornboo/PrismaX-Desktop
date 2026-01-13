@@ -8,6 +8,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText, type CoreMessage } from "ai";
 import { BrowserWindow } from "electron";
+import { IPC_EVENTS } from "../ipc/channels";
 import { getProvider, getProviderApiKey } from "./provider";
 import { createMessage, updateMessage } from "./message";
 import { updateConversation } from "./conversation";
@@ -98,7 +99,7 @@ export async function sendChatMessage(
           fullContent += chunk;
 
           // 发送 token 到渲染进程
-          window.webContents.send("chat:token", {
+          window.webContents.send(IPC_EVENTS.chat.token, {
             requestId,
             token: chunk,
           });
@@ -117,14 +118,14 @@ export async function sendChatMessage(
         }
 
         // 发送完成事件
-        window.webContents.send("chat:done", { requestId });
+        window.webContents.send(IPC_EVENTS.chat.done, { requestId });
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
           // 请求被取消
-          window.webContents.send("chat:done", { requestId });
+          window.webContents.send(IPC_EVENTS.chat.done, { requestId });
         } else {
           const message = error instanceof Error ? error.message : "AI 调用失败";
-          window.webContents.send("chat:error", { requestId, message });
+          window.webContents.send(IPC_EVENTS.chat.error, { requestId, message });
         }
       } finally {
         activeRequests.delete(requestId);
@@ -138,7 +139,7 @@ export async function sendChatMessage(
   } catch (error) {
     activeRequests.delete(requestId);
     const message = error instanceof Error ? error.message : "发送消息失败";
-    window.webContents.send("chat:error", { requestId, message });
+    window.webContents.send(IPC_EVENTS.chat.error, { requestId, message });
     throw error;
   }
 }

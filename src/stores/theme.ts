@@ -30,10 +30,10 @@ export const useThemeStore = create<ThemeState>((set) => ({
   initTheme: async () => {
     // 从设置加载主题
     if (window.electron) {
-      const savedTheme = await window.electron.settings.get<Theme>("theme");
-      if (savedTheme) {
-        set({ theme: savedTheme });
-        applyTheme(savedTheme);
+      const savedThemeRes = await window.electron.settings.get<Theme>("theme");
+      if (savedThemeRes.success && savedThemeRes.data) {
+        set({ theme: savedThemeRes.data });
+        applyTheme(savedThemeRes.data);
         return;
       }
     }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download, Upload, Trash2, FolderOpen, RefreshCw } from "lucide-react";
+import { isIpcCancelled } from "@/lib/ipc";
 import { useConversationStore } from "@/stores";
 
 export function DataSettings() {
@@ -19,12 +20,13 @@ export function DataSettings() {
   useEffect(() => {
     let canceled = false;
     (async () => {
-      try {
-        const info = await window.electron.system.getAppInfo();
-        if (!canceled) setAppInfo(info);
-      } catch {
-        if (!canceled) setAppInfo(null);
+      const infoRes = await window.electron.system.getAppInfo();
+      if (canceled) return;
+      if (!infoRes.success) {
+        setAppInfo(null);
+        return;
       }
+      setAppInfo(infoRes.data);
     })();
     return () => {
       canceled = true;
@@ -35,8 +37,8 @@ export function DataSettings() {
     setBusy(true);
     try {
       await loadConversations();
-      const info = await window.electron.system.getAppInfo();
-      setAppInfo(info);
+      const infoRes = await window.electron.system.getAppInfo();
+      if (infoRes.success) setAppInfo(infoRes.data);
     } finally {
       setBusy(false);
     }
@@ -45,35 +47,27 @@ export function DataSettings() {
   const handleOpenDataDir = async () => {
     if (!appInfo) return;
     const result = await window.electron.system.openPath(appInfo.userDataPath);
-    if (!result.success) {
-      alert(result.error || "打开失败");
-    }
+    if (result.success) return;
+    if (isIpcCancelled(result)) return;
+    alert(result.error);
   };
 
   const handleMigrateDataDir = async () => {
-    const targetDir = await window.electron.system.selectDirectory();
-    if (!targetDir) return;
-
-    const ok = confirm(
-      [
-        "此操作将复制当前数据目录到新目录，并重启应用。",
-        "",
-        "要求：目标目录必须是空目录。",
-        "风险：数据量较大时会耗时较长；中途不要强制退出应用。",
-        "",
-        `目标目录：${targetDir}`,
-        "",
-        "确认继续？",
-      ].join("\n"),
-    );
-    if (!ok) return;
+    const dirRes = await window.electron.system.selectDirectory();
+    if (!dirRes.success) {
+      if (isIpcCancelled(dirRes)) return;
+      alert(dirRes.error);
+      return;
+    }
 
     setBusy(true);
     try {
-      await window.electron.data.migrateDataRoot(targetDir);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "迁移失败";
-      alert(message);
+      const result = await window.electron.data.migrateDataRoot(dirRes.data);
+      if (!result.success) {
+        if (isIpcCancelled(result)) return;
+        alert(result.error);
+      }
+    } finally {
       setBusy(false);
     }
   };
@@ -82,8 +76,12 @@ export function DataSettings() {
     setBusy(true);
     try {
       const result = await window.electron.data.exportConversations();
-      if (!result) return;
-      alert(`已导出到：${result.filePath}`);
+      if (!result.success) {
+        if (isIpcCancelled(result)) return;
+        alert(result.error);
+        return;
+      }
+      alert(`已导出到：${result.data.filePath}`);
     } finally {
       setBusy(false);
     }
@@ -93,8 +91,12 @@ export function DataSettings() {
     setBusy(true);
     try {
       const result = await window.electron.data.exportSettings();
-      if (!result) return;
-      alert(`已导出到：${result.filePath}\n\n注意：不包含 API Key。`);
+      if (!result.success) {
+        if (isIpcCancelled(result)) return;
+        alert(result.error);
+        return;
+      }
+      alert(`已导出到：${result.data.filePath}\n\n注意：不包含 API Key。`);
     } finally {
       setBusy(false);
     }
@@ -104,10 +106,14 @@ export function DataSettings() {
     setBusy(true);
     try {
       const result = await window.electron.data.importConversations();
-      if (!result) return;
+      if (!result.success) {
+        if (isIpcCancelled(result)) return;
+        alert(result.error);
+        return;
+      }
       await loadConversations();
       alert(
-        `导入完成：\n- 会话：${result.conversationsAdded}\n- 消息：${result.messagesAdded}\n\n来源：${result.filePath}`,
+        `导入完成：\n- 会话：${result.data.conversationsAdded}\n- 消息：${result.data.messagesAdded}\n\n来源：${result.data.filePath}`,
       );
     } finally {
       setBusy(false);
@@ -118,9 +124,13 @@ export function DataSettings() {
     setBusy(true);
     try {
       const result = await window.electron.data.importSettings();
-      if (!result) return;
+      if (!result.success) {
+        if (isIpcCancelled(result)) return;
+        alert(result.error);
+        return;
+      }
       alert(
-        `导入完成：\n- 设置项：${result.settingsUpdated}\n- 提供商配置：${result.providersUpdated}\n\n来源：${result.filePath}\n\n注意：不包含 API Key。`,
+        `导入完成：\n- 设置项：${result.data.settingsUpdated}\n- 提供商配置：${result.data.providersUpdated}\n\n来源：${result.data.filePath}\n\n注意：不包含 API Key。`,
       );
     } finally {
       setBusy(false);
@@ -128,33 +138,32 @@ export function DataSettings() {
   };
 
   const handleClearAllConversations = async () => {
-    const ok = confirm("确定要删除所有会话与消息吗？此操作不可恢复。");
-    if (!ok) return;
-
     setBusy(true);
     try {
       const result = await window.electron.data.clearAllConversations();
+      if (!result.success) {
+        if (isIpcCancelled(result)) return;
+        alert(result.error);
+        return;
+      }
       await loadConversations();
-      alert(`已清空：\n- 会话：${result.deletedConversations}\n- 消息：${result.deletedMessages}`);
+      alert(
+        `已清空：\n- 会话：${result.data.deletedConversations}\n- 消息：${result.data.deletedMessages}`,
+      );
     } finally {
       setBusy(false);
     }
   };
 
   const handleResetApp = async () => {
-    const ok = confirm(
-      [
-        "确定要重置应用吗？",
-        "",
-        "这将清空所有会话、消息、设置与模型/提供商配置（不含系统 Keychain）。",
-        "此操作不可恢复。",
-      ].join("\n"),
-    );
-    if (!ok) return;
-
     setBusy(true);
     try {
-      await window.electron.data.resetApp();
+      const result = await window.electron.data.resetApp();
+      if (!result.success) {
+        if (isIpcCancelled(result)) return;
+        alert(result.error);
+        return;
+      }
       await refresh();
       alert("重置完成。");
     } finally {

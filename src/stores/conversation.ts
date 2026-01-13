@@ -17,7 +17,7 @@ interface ConversationState {
 
   // 操作
   loadConversations: () => Promise<void>;
-  createConversation: (title?: string) => Promise<Conversation>;
+  createConversation: (title?: string) => Promise<Conversation | null>;
   deleteConversation: (id: string) => Promise<void>;
   updateConversation: (id: string, updates: { title?: string; pinned?: boolean }) => Promise<void>;
   selectConversation: (id: string | null) => Promise<void>;
@@ -38,84 +38,81 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   // 加载会话列表
   loadConversations: async () => {
     set({ isLoading: true, error: null });
-    try {
-      const conversations = await window.electron.db.getConversations();
-      set({ conversations, isLoading: false });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "加载会话失败";
-      set({ error: message, isLoading: false });
+    const res = await window.electron.db.getConversations();
+    if (!res.success) {
+      set({ error: res.error, isLoading: false });
+      return;
     }
+    set({ conversations: res.data, isLoading: false });
   },
 
   // 创建新会话
   createConversation: async (title?: string) => {
     set({ isLoading: true, error: null });
-    try {
-      const conversation = await window.electron.db.createConversation(title);
-      set((state) => ({
-        conversations: [conversation, ...state.conversations],
-        currentConversationId: conversation.id,
-        messages: [],
-        isLoading: false,
-      }));
-      return conversation;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "创建会话失败";
-      set({ error: message, isLoading: false });
-      throw error;
+    const res = await window.electron.db.createConversation(title);
+    if (!res.success) {
+      set({ error: res.error, isLoading: false });
+      return null;
     }
+
+    const conversation = res.data;
+    set((state) => ({
+      conversations: [conversation, ...state.conversations],
+      currentConversationId: conversation.id,
+      messages: [],
+      isLoading: false,
+    }));
+    return conversation;
   },
 
   // 删除会话
   deleteConversation: async (id: string) => {
     set({ isLoading: true, error: null });
-    try {
-      await window.electron.db.deleteConversation(id);
-      const { currentConversationId, conversations } = get();
+    const deleteRes = await window.electron.db.deleteConversation(id);
+    if (!deleteRes.success) {
+      set({ error: deleteRes.error, isLoading: false });
+      return;
+    }
 
-      // 更新会话列表
-      const newConversations = conversations.filter((c) => c.id !== id);
+    const { currentConversationId, conversations } = get();
+    const newConversations = conversations.filter((c) => c.id !== id);
 
-      // 如果删除的是当前会话，切换到第一个会话或清空
-      let newCurrentId = currentConversationId;
-      let newMessages: Message[] = get().messages;
+    let newCurrentId = currentConversationId;
+    let newMessages: Message[] = get().messages;
 
-      if (currentConversationId === id) {
-        newCurrentId = newConversations.length > 0 ? newConversations[0].id : null;
-        newMessages = [];
+    if (currentConversationId === id) {
+      newCurrentId = newConversations.length > 0 ? newConversations[0].id : null;
+      newMessages = [];
 
-        // 如果有新的当前会话，加载其消息
-        if (newCurrentId) {
-          const messages = await window.electron.db.getMessages(newCurrentId);
-          newMessages = messages;
+      if (newCurrentId) {
+        const messagesRes = await window.electron.db.getMessages(newCurrentId);
+        if (messagesRes.success) {
+          newMessages = messagesRes.data;
+        } else {
+          set({ error: messagesRes.error });
         }
       }
-
-      set({
-        conversations: newConversations,
-        currentConversationId: newCurrentId,
-        messages: newMessages,
-        isLoading: false,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "删除会话失败";
-      set({ error: message, isLoading: false });
     }
+
+    set({
+      conversations: newConversations,
+      currentConversationId: newCurrentId,
+      messages: newMessages,
+      isLoading: false,
+    });
   },
 
   // 更新会话
   updateConversation: async (id, updates) => {
-    try {
-      const updated = await window.electron.db.updateConversation(id, updates);
-      if (updated) {
-        set((state) => ({
-          conversations: state.conversations.map((c) => (c.id === id ? updated : c)),
-        }));
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "更新会话失败";
-      set({ error: message });
+    const res = await window.electron.db.updateConversation(id, updates);
+    if (!res.success) {
+      set({ error: res.error });
+      return;
     }
+    const updated = res.data;
+    set((state) => ({
+      conversations: state.conversations.map((c) => (c.id === id ? updated : c)),
+    }));
   },
 
   // 选择会话
@@ -132,13 +129,12 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   // 加载消息
   loadMessages: async (conversationId) => {
     set({ isLoading: true, error: null });
-    try {
-      const messages = await window.electron.db.getMessages(conversationId);
-      set({ messages, isLoading: false });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "加载消息失败";
-      set({ error: message, isLoading: false });
+    const res = await window.electron.db.getMessages(conversationId);
+    if (!res.success) {
+      set({ error: res.error, isLoading: false });
+      return;
     }
+    set({ messages: res.data, isLoading: false });
   },
 
   // 添加消息（本地）

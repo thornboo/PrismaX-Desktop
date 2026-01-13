@@ -36,50 +36,50 @@ export function ChatPage() {
     if (!messageContent || isGenerating) return;
 
     setInput("");
-
-    try {
-      let conversationId = currentConversationId;
-      if (!conversationId) {
-        const conversation = await createConversation();
-        conversationId = conversation.id;
-      }
-
-      setIsGenerating(true);
-
-      const userMessage: Message = {
-        id: crypto.randomUUID(),
-        conversationId,
-        role: "user",
-        content: messageContent,
-        modelId: null,
-        promptTokens: null,
-        completionTokens: null,
-        createdAt: new Date().toISOString(),
-      };
-      addMessage(userMessage);
-
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        conversationId,
-        role: "assistant",
-        content: "",
-        modelId: null,
-        promptTokens: null,
-        completionTokens: null,
-        createdAt: new Date().toISOString(),
-      };
-      addMessage(assistantMessage);
-
-      const result = await window.electron.chat.send({
-        conversationId,
-        content: messageContent,
-      });
-
-      setCurrentRequestId(result.requestId);
-    } catch (error) {
-      console.error("发送消息失败:", error);
-      setIsGenerating(false);
+    let conversationId = currentConversationId;
+    if (!conversationId) {
+      const conversation = await createConversation();
+      if (!conversation) return;
+      conversationId = conversation.id;
     }
+
+    setIsGenerating(true);
+
+    const userMessage: Message = {
+      id: crypto.randomUUID(),
+      conversationId,
+      role: "user",
+      content: messageContent,
+      modelId: null,
+      promptTokens: null,
+      completionTokens: null,
+      createdAt: new Date().toISOString(),
+    };
+    addMessage(userMessage);
+
+    const assistantMessage: Message = {
+      id: crypto.randomUUID(),
+      conversationId,
+      role: "assistant",
+      content: "",
+      modelId: null,
+      promptTokens: null,
+      completionTokens: null,
+      createdAt: new Date().toISOString(),
+    };
+    addMessage(assistantMessage);
+
+    const result = await window.electron.chat.send({
+      conversationId,
+      content: messageContent,
+    });
+    if (!result.success) {
+      console.error("发送消息失败:", result.error);
+      setIsGenerating(false);
+      return;
+    }
+
+    setCurrentRequestId(result.data.requestId);
   };
 
   const handleStop = async () => {
@@ -94,13 +94,12 @@ export function ChatPage() {
 
   const handleDeleteMessage = async (messageId: string) => {
     if (!confirm("确定要删除这条消息吗？")) return;
-
-    try {
-      await window.electron.db.deleteMessage(messageId);
-      if (currentConversationId) loadMessages(currentConversationId);
-    } catch (error) {
-      console.error("删除消息失败:", error);
+    const result = await window.electron.db.deleteMessage(messageId);
+    if (!result.success) {
+      console.error("删除消息失败:", result.error);
+      return;
     }
+    if (currentConversationId) loadMessages(currentConversationId);
   };
 
   const handleStartEdit = (message: Message) => {
@@ -115,16 +114,15 @@ export function ChatPage() {
 
   const handleSaveEdit = async () => {
     if (!editingMessageId || !editContent.trim()) return;
-
-    try {
-      await window.electron.db.updateMessage(editingMessageId, {
-        content: editContent.trim(),
-      });
-      if (currentConversationId) loadMessages(currentConversationId);
-      handleCancelEdit();
-    } catch (error) {
-      console.error("更新消息失败:", error);
+    const result = await window.electron.db.updateMessage(editingMessageId, {
+      content: editContent.trim(),
+    });
+    if (!result.success) {
+      console.error("更新消息失败:", result.error);
+      return;
     }
+    if (currentConversationId) loadMessages(currentConversationId);
+    handleCancelEdit();
   };
 
   const handleRegenerate = async (userMessageIndex: number) => {
@@ -134,7 +132,11 @@ export function ChatPage() {
 
     const messagesToDelete = messages.slice(userMessageIndex);
     for (const msg of messagesToDelete) {
-      await window.electron.db.deleteMessage(msg.id);
+      const res = await window.electron.db.deleteMessage(msg.id);
+      if (!res.success) {
+        console.error("删除消息失败:", res.error);
+        return;
+      }
     }
 
     await handleSend(userMessage.content);

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { isIpcCancelled } from "@/lib/ipc";
 import type {
   KnowledgeBaseType,
   KnowledgeDocument,
@@ -52,14 +53,36 @@ export function KnowledgeBasePage() {
     if (!kbIdSafe) return;
     setBusy(true);
     try {
-      const bases = await window.electron.knowledge.listBases();
-      const found = bases.find((b) => b.id === kbIdSafe) ?? null;
+      const basesRes = await window.electron.knowledge.listBases();
+      if (!basesRes.success) {
+        console.error("加载知识库失败:", basesRes.error);
+        return;
+      }
+      const found = basesRes.data.find((b) => b.id === kbIdSafe) ?? null;
       setKb(found);
-      setProviders(await window.electron.provider.getAll());
-      setJobs(await window.electron.knowledge.listJobs(kbIdSafe));
-      setDocuments(await window.electron.knowledge.listDocuments({ kbId: kbIdSafe, limit: 200 }));
-      setStats(await window.electron.knowledge.getStats(kbIdSafe));
-      setVectorConfig((await window.electron.knowledge.getVectorConfig(kbIdSafe)).config);
+
+      const providersRes = await window.electron.provider.getAll();
+      if (providersRes.success) setProviders(providersRes.data);
+      else console.error("加载提供商失败:", providersRes.error);
+
+      const jobsRes = await window.electron.knowledge.listJobs(kbIdSafe);
+      if (jobsRes.success) setJobs(jobsRes.data);
+      else console.error("加载任务失败:", jobsRes.error);
+
+      const documentsRes = await window.electron.knowledge.listDocuments({
+        kbId: kbIdSafe,
+        limit: 200,
+      });
+      if (documentsRes.success) setDocuments(documentsRes.data);
+      else console.error("加载文档失败:", documentsRes.error);
+
+      const statsRes = await window.electron.knowledge.getStats(kbIdSafe);
+      if (statsRes.success) setStats(statsRes.data);
+      else console.error("加载统计失败:", statsRes.error);
+
+      const vectorConfigRes = await window.electron.knowledge.getVectorConfig(kbIdSafe);
+      if (vectorConfigRes.success) setVectorConfig(vectorConfigRes.data.config);
+      else console.error("加载向量配置失败:", vectorConfigRes.error);
     } finally {
       setBusy(false);
     }
@@ -96,28 +119,48 @@ export function KnowledgeBasePage() {
 
   const handleOpenDir = async () => {
     if (!kb?.dir) return;
-    await window.electron.system.openPath(kb.dir);
+    const res = await window.electron.system.openPath(kb.dir);
+    if (!res.success) alert(res.error);
   };
 
   const handleImportFiles = async () => {
     if (!kbIdSafe) return;
-    const filePaths = await window.electron.knowledge.selectFiles();
-    if (!filePaths || filePaths.length === 0) return;
-    await window.electron.knowledge.importFiles({
+    const filePathsRes = await window.electron.knowledge.selectFiles();
+    if (!filePathsRes.success) {
+      if (isIpcCancelled(filePathsRes)) return;
+      alert(filePathsRes.error);
+      return;
+    }
+    const filePaths = filePathsRes.data;
+    if (filePaths.length === 0) return;
+
+    const importRes = await window.electron.knowledge.importFiles({
       kbId: kbIdSafe,
       sources: [{ type: "files", paths: filePaths }],
     });
+    if (!importRes.success) {
+      alert(importRes.error);
+      return;
+    }
     await loadAll();
   };
 
   const handleImportDirectory = async () => {
     if (!kbIdSafe) return;
-    const dir = await window.electron.system.selectDirectory();
-    if (!dir) return;
-    await window.electron.knowledge.importFiles({
+    const dirRes = await window.electron.system.selectDirectory();
+    if (!dirRes.success) {
+      if (isIpcCancelled(dirRes)) return;
+      alert(dirRes.error);
+      return;
+    }
+    const importRes = await window.electron.knowledge.importFiles({
       kbId: kbIdSafe,
-      sources: [{ type: "directory", paths: [dir] }],
+      sources: [{ type: "directory", paths: [dirRes.data] }],
     });
+    if (!importRes.success) {
+      alert(importRes.error);
+      return;
+    }
     await loadAll();
   };
 
@@ -129,7 +172,11 @@ export function KnowledgeBasePage() {
       return;
     }
     const res = await window.electron.knowledge.search({ kbId: kbIdSafe, query: q, limit: 30 });
-    setResults(res.results);
+    if (!res.success) {
+      alert(res.error);
+      return;
+    }
+    setResults(res.data.results);
   };
 
   const handleSemanticSearch = async () => {
@@ -150,7 +197,11 @@ export function KnowledgeBasePage() {
       query: q,
       topK: semanticTopK,
     });
-    setSemanticResults(res.results);
+    if (!res.success) {
+      alert(res.error);
+      return;
+    }
+    setSemanticResults(res.data.results);
   };
 
   const handleBuildVectorIndex = async () => {
@@ -159,11 +210,15 @@ export function KnowledgeBasePage() {
       alert("请先选择并启用一个提供商");
       return;
     }
-    await window.electron.knowledge.buildVectorIndex({
+    const res = await window.electron.knowledge.buildVectorIndex({
       kbId: kbIdSafe,
       providerId: embeddingProviderId,
       model: embeddingModel.trim(),
     });
+    if (!res.success) {
+      alert(res.error);
+      return;
+    }
     await loadAll();
   };
 
@@ -173,7 +228,14 @@ export function KnowledgeBasePage() {
       "⚠️ 危险操作：将删除该知识库的向量索引（派生数据）并清空索引状态，之后需要重新构建。是否继续？",
     );
     if (!confirmed) return;
-    await window.electron.knowledge.rebuildVectorIndex({ kbId: kbIdSafe, confirmed: true });
+    const res = await window.electron.knowledge.rebuildVectorIndex({
+      kbId: kbIdSafe,
+      confirmed: true,
+    });
+    if (!res.success) {
+      alert(res.error);
+      return;
+    }
     setSemanticResults([]);
     await loadAll();
   };
@@ -184,11 +246,15 @@ export function KnowledgeBasePage() {
       alert("请输入笔记标题");
       return;
     }
-    await window.electron.knowledge.createNote({
+    const res = await window.electron.knowledge.createNote({
       kbId: kbIdSafe,
       title: noteTitle.trim(),
       content: noteContent,
     });
+    if (!res.success) {
+      alert(res.error);
+      return;
+    }
     setNoteTitle("");
     setNoteContent("");
     await loadAll();
@@ -198,19 +264,35 @@ export function KnowledgeBasePage() {
     if (!kbIdSafe) return;
     const confirmed = confirm("⚠️ 危险操作：确定要删除该知识库及其所有文件吗？此操作不可恢复。");
     if (!confirmed) return;
-    await window.electron.knowledge.deleteBase({ kbId: kbIdSafe, confirmed: true });
+    const res = await window.electron.knowledge.deleteBase({ kbId: kbIdSafe, confirmed: true });
+    if (!res.success) {
+      alert(res.error);
+      return;
+    }
     navigate("/knowledge");
   };
 
   const handleDeleteDocument = async (documentId: string) => {
     const confirmed = confirm("⚠️ 危险操作：确定要从知识库删除该文档吗？相关索引也会被删除。");
     if (!confirmed) return;
-    await window.electron.knowledge.deleteDocument({ kbId: kbIdSafe, documentId, confirmed: true });
+    const res = await window.electron.knowledge.deleteDocument({
+      kbId: kbIdSafe,
+      documentId,
+      confirmed: true,
+    });
+    if (!res.success) {
+      alert(res.error);
+      return;
+    }
     await loadAll();
   };
 
   const handlePause = async (jobId: string) => {
-    await window.electron.knowledge.pauseJob({ kbId: kbIdSafe, jobId });
+    const res = await window.electron.knowledge.pauseJob({ kbId: kbIdSafe, jobId });
+    if (!res.success) {
+      alert(res.error);
+      return;
+    }
     await loadAll();
   };
 
@@ -220,14 +302,22 @@ export function KnowledgeBasePage() {
         alert("请先选择并启用一个提供商");
         return;
       }
-      await window.electron.knowledge.resumeVectorIndex({
+      const res = await window.electron.knowledge.resumeVectorIndex({
         kbId: kbIdSafe,
         jobId,
         providerId: embeddingProviderId,
         model: embeddingModel.trim(),
       });
+      if (!res.success) {
+        alert(res.error);
+        return;
+      }
     } else {
-      await window.electron.knowledge.resumeJob({ kbId: kbIdSafe, jobId });
+      const res = await window.electron.knowledge.resumeJob({ kbId: kbIdSafe, jobId });
+      if (!res.success) {
+        alert(res.error);
+        return;
+      }
     }
     await loadAll();
   };
@@ -235,7 +325,11 @@ export function KnowledgeBasePage() {
   const handleCancel = async (jobId: string) => {
     const confirmed = confirm("⚠️ 危险操作：确定要取消该导入任务吗？未处理项将被标记为跳过。");
     if (!confirmed) return;
-    await window.electron.knowledge.cancelJob({ kbId: kbIdSafe, jobId });
+    const res = await window.electron.knowledge.cancelJob({ kbId: kbIdSafe, jobId });
+    if (!res.success) {
+      alert(res.error);
+      return;
+    }
     await loadAll();
   };
 

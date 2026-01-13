@@ -22,8 +22,13 @@ export function KnowledgeListPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const list = await window.electron.knowledge.listBases();
-      setBases(list);
+      const listRes = await window.electron.knowledge.listBases();
+      if (!listRes.success) {
+        console.error("加载知识库失败:", listRes.error);
+        setBases([]);
+        return;
+      }
+      setBases(listRes.data);
     } finally {
       setLoading(false);
     }
@@ -37,15 +42,23 @@ export function KnowledgeListPage() {
     const name = prompt("请输入知识库名称");
     if (!name) return;
     const description = prompt("请输入描述（可选）") ?? null;
-    const created = await window.electron.knowledge.createBase({ name, description });
+    const createdRes = await window.electron.knowledge.createBase({ name, description });
+    if (!createdRes.success) {
+      alert(createdRes.error);
+      return;
+    }
     await load();
-    navigate(`/knowledge/${created.id}`);
+    navigate(`/knowledge/${createdRes.data.id}`);
   };
 
   const handleDelete = async (kbId: string) => {
     const confirmed = confirm("⚠️ 危险操作：确定要删除该知识库及其所有文件吗？此操作不可恢复。");
     if (!confirmed) return;
-    await window.electron.knowledge.deleteBase({ kbId, confirmed: true });
+    const res = await window.electron.knowledge.deleteBase({ kbId, confirmed: true });
+    if (!res.success) {
+      alert(res.error);
+      return;
+    }
     await load();
   };
 

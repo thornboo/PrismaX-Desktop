@@ -15,20 +15,29 @@ export function ModelsSettings() {
   }, []);
 
   const loadData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const providersData = await window.electron.provider.getAll();
-      setProviders(providersData);
+      const providersRes = await window.electron.provider.getAll();
+      if (!providersRes.success) {
+        console.error("加载提供商失败:", providersRes.error);
+        setProviders([]);
+        setModels({});
+        return;
+      }
 
-      // 加载每个提供商的模型
+      setProviders(providersRes.data);
+
       const modelsData: Record<string, Model[]> = {};
-      for (const provider of providersData) {
-        const providerModels = await window.electron.provider.getModels(provider.id);
-        modelsData[provider.id] = providerModels;
+      for (const provider of providersRes.data) {
+        const providerModelsRes = await window.electron.provider.getModels(provider.id);
+        if (!providerModelsRes.success) {
+          console.error(`加载模型失败(${provider.id}):`, providerModelsRes.error);
+          modelsData[provider.id] = [];
+          continue;
+        }
+        modelsData[provider.id] = providerModelsRes.data;
       }
       setModels(modelsData);
-    } catch (error) {
-      console.error("加载数据失败:", error);
     } finally {
       setLoading(false);
     }
@@ -39,14 +48,14 @@ export function ModelsSettings() {
     id: string,
     updates: { apiKey?: string; baseUrl?: string; enabled?: boolean },
   ) => {
+    setSaving(id);
     try {
-      setSaving(id);
-      const updated = await window.electron.provider.update(id, updates);
-      if (updated) {
-        setProviders((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      const updatedRes = await window.electron.provider.update(id, updates);
+      if (!updatedRes.success) {
+        console.error("更新失败:", updatedRes.error);
+        return;
       }
-    } catch (error) {
-      console.error("更新失败:", error);
+      setProviders((prev) => prev.map((p) => (p.id === id ? updatedRes.data : p)));
     } finally {
       setSaving(null);
     }

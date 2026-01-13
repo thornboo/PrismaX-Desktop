@@ -1,6 +1,7 @@
 import path from "node:path";
 import { app, BrowserWindow, dialog, Tray, Menu, nativeImage } from "electron";
 import { registerIpcHandlers } from "./ipc";
+import { IPC_EVENTS } from "./ipc/channels";
 import { initDatabase, closeDatabase } from "./db";
 import { applyUserDataPathEarly } from "./services/app-data";
 
@@ -74,7 +75,7 @@ function createTray() {
       label: "新建会话",
       click: () => {
         mainWindow?.show();
-        mainWindow?.webContents.send("new-conversation");
+        mainWindow?.webContents.send(IPC_EVENTS.ui.newConversation);
       },
     },
     { type: "separator" },
@@ -88,7 +89,7 @@ function createTray() {
       label: "设置",
       click: () => {
         mainWindow?.show();
-        mainWindow?.webContents.send("open-settings");
+        mainWindow?.webContents.send(IPC_EVENTS.ui.openSettings);
       },
     },
     { type: "separator" },

@@ -45,14 +45,10 @@ export function Sidebar() {
 
   // 创建新会话
   const handleNewConversation = async () => {
-    try {
-      await createConversation();
-      // 导航到聊天页面
-      if (location.pathname !== "/") {
-        navigate("/");
-      }
-    } catch (error) {
-      console.error("创建会话失败:", error);
+    const created = await createConversation();
+    if (!created) return;
+    if (location.pathname !== "/") {
+      navigate("/");
     }
   };
 
